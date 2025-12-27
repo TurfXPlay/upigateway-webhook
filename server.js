@@ -62,7 +62,8 @@ app.post("/create-payment", async (req, res) => {
     p_info: "TurfX Community Payment",
     customer_name: name,
     customer_mobile: mobile,
-    redirect_url: "http://localhost:3000/pay" // change to prod URL later
+     customer_email: `${mobile}@turfxtemp.com`,
+    redirect_url: "https://upigateway-webhook.onrender.com/pay"
   };
 
   try {
