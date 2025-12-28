@@ -2,11 +2,27 @@ const express = require("express");
 const router = express.Router();
 const { google } = require("googleapis");
 
-router.get("/admin/payments/:date", async (req, res) => {
-  const date = req.params.date;
+/**
+ * Helper: get today's date in IST (YYYY-MM-DD)
+ */
+function getTodayIST() {
+  const now = new Date();
+  const istDate = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+  );
+  return istDate.toISOString().split("T")[0];
+}
+
+/**
+ * Route:
+ * /admin/payments           → today (IST)
+ * /admin/payments/:date     → specific date
+ */
+router.get("/admin/payments/:date?", async (req, res) => {
+  const date = req.params.date || getTodayIST();
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return res.status(400).send("Invalid date format");
+    return res.status(400).send("Invalid date format. Use YYYY-MM-DD");
   }
 
   try {
@@ -28,6 +44,7 @@ router.get("/admin/payments/:date", async (req, res) => {
     });
 
     const rows = readRes.data.values || [];
+
     if (rows.length <= 1) {
       return res.send(renderNoData(date));
     }
@@ -50,7 +67,7 @@ router.get("/admin/payments/:date", async (req, res) => {
       const amount = Number(row[idxAmount] || 0);
       totalAmount += amount;
 
-      const istTime = row[idxCreatedAt]
+      const timeIST = row[idxCreatedAt]
         ? new Date(row[idxCreatedAt]).toLocaleTimeString("en-IN", {
             hour: "2-digit",
             minute: "2-digit",
@@ -60,7 +77,7 @@ router.get("/admin/payments/:date", async (req, res) => {
         : "";
 
       return {
-        time: istTime,
+        time: timeIST,
         userName: row[idxUserName] || row[idxUpiName] || "",
         upiName: row[idxUpiName] || "",
         amount,
@@ -78,15 +95,27 @@ router.get("/admin/payments/:date", async (req, res) => {
       })
     );
   } catch (err) {
-    console.error(err);
+    console.error("Admin payments error:", err);
     res.status(500).send("Failed to load payments");
   }
 });
 
+/* =========================
+   HTML render helpers
+========================= */
+
 function renderNoData(date) {
   return `
-    <h2>Payments — ${date}</h2>
-    <p>No payments found.</p>
+  <html>
+    <head>
+      <title>Payments — ${date}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body style="font-family: Arial; padding: 16px;">
+      <h2>Payments — ${date}</h2>
+      <p>No payments found for this date.</p>
+    </body>
+  </html>
   `;
 }
 
@@ -120,9 +149,7 @@ function renderTable({ date, rows, totalAmount, totalTransactions }) {
           </tr>
         </thead>
         <tbody>
-          ${rows
-            .map(
-              r => `
+          ${rows.map(r => `
             <tr>
               <td>${r.time}</td>
               <td>${r.userName}</td>
@@ -131,9 +158,7 @@ function renderTable({ date, rows, totalAmount, totalTransactions }) {
               <td>${r.txnId}</td>
               <td>${r.upiName}</td>
             </tr>
-          `
-            )
-            .join("")}
+          `).join("")}
         </tbody>
       </table>
 
