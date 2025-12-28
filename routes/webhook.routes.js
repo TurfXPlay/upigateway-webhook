@@ -1,13 +1,11 @@
 const express = require("express");
 const router = express.Router();
+const { writePaymentToSheet } = require("../services/sheets.service");
 
-// In-memory store to prevent duplicate processing (TEMP)
+// In-memory duplicate guard (runtime only)
 const processedTxns = new Set();
 
-/* =========================
-   UPIGateway Webhook
-========================= */
-router.post("/api/upigateway/webhook", (req, res) => {
+router.post("/api/upigateway/webhook", async (req, res) => {
   console.log("====================================");
   console.log("🔔 WEBHOOK HIT");
   console.log("Headers:", req.headers);
@@ -15,28 +13,31 @@ router.post("/api/upigateway/webhook", (req, res) => {
   console.log("====================================");
 
   if (!req.body || Object.keys(req.body).length === 0) {
-    console.log("ℹ️ Empty webhook body (ping / verification)");
+    console.log("ℹ️ Empty webhook body");
     return res.status(200).send("OK");
   }
 
-  const { client_txn_id, status, upi_txn_id, amount } = req.body;
+  const { client_txn_id, status, upi_txn_id } = req.body;
 
-  if (!client_txn_id || !status) {
+  if (!client_txn_id || !status || !upi_txn_id) {
     console.log("⚠️ Invalid webhook payload");
     return res.status(200).send("OK");
   }
 
-  if (processedTxns.has(client_txn_id)) {
-    console.log("🔁 Duplicate webhook ignored:", client_txn_id);
+  if (processedTxns.has(upi_txn_id)) {
+    console.log("🔁 Duplicate webhook ignored:", upi_txn_id);
     return res.status(200).send("OK");
   }
 
   if (status === "success") {
-    console.log("✅ PAYMENT SUCCESS");
-    console.log({ client_txn_id, upi_txn_id, amount });
-    processedTxns.add(client_txn_id);
+    try {
+      await writePaymentToSheet(req.body);
+      processedTxns.add(upi_txn_id);
+    } catch (err) {
+      console.error("❌ Failed to write to Google Sheet:", err);
+    }
   } else {
-    console.log("❌ PAYMENT NOT SUCCESSFUL:", status);
+    console.log("❌ Payment not successful:", status);
   }
 
   res.status(200).send("OK");
