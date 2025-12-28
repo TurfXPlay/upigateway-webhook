@@ -12,6 +12,7 @@ const payload = {
   customer_name: name,
   customer_mobile: mobile,
   customer_email: `${mobile}@turfxtemp.com`,
+  udf1: name,
   redirect_url: `${baseUrl}/payment-success.html`
 };
 

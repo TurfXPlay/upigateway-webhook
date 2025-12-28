@@ -1,61 +1,175 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>TurfX Community Payment</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <title>TurfX Payment</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f7f7;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 420px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    label {
+      font-size: 14px;
+      margin-top: 12px;
+      display: block;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      font-size: 14px;
+    }
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 12px;
+      font-size: 16px;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #e0e0e0;
+      color: #000;
+      margin-top: 10px;
+    }
+    .note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #555;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
 
-  <h2>TurfX Community Payment</h2>
+  <div class="container">
+    <h2>TurfX Community Payment</h2>
 
-  <form id="payForm">
-    <label>
-      Name<br>
-      <input type="text" id="name" required>
-    </label>
-    <br><br>
+    <form id="payForm">
 
-    <label>
-      Mobile<br>
-      <input type="tel" id="mobile" required>
-    </label>
-    <br><br>
+      <label>Name</label>
+      <input type="text" id="name" required />
 
-    <label>
-      Amount (₹)<br>
-      <input type="number" id="amount" required>
-    </label>
-    <br><br>
+      <label>Mobile</label>
+      <input type="tel" id="mobile" required />
 
-    <button type="submit">Pay Now</button>
-  </form>
+      <label>Amount (₹)</label>
+      <input
+        type="number"
+        id="amount"
+        required
+        min="1"
+        max="10000"
+        step="1"
+        placeholder="Enter amount"
+      />
+
+      <button type="submit">Pay Now</button>
+    </form>
+
+    <button id="changeUserBtn" class="secondary" style="display:none;">
+      Change user
+    </button>
+
+    <div class="note">
+      If payment succeeds, admin will confirm your slot.
+    </div>
+  </div>
 
   <script>
-    console.log("pay.html loaded");
+    const STORAGE_KEY = "turfx_user";
 
-    document.getElementById("payForm").addEventListener("submit", async function (e) {
+    const nameInput = document.getElementById("name");
+    const mobileInput = document.getElementById("mobile");
+    const amountInput = document.getElementById("amount");
+    const changeUserBtn = document.getElementById("changeUserBtn");
+    const form = document.getElementById("payForm");
+
+    // Load saved user (if exists)
+    const savedUser = localStorage.getItem(STORAGE_KEY);
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        if (user.name && user.mobile) {
+          nameInput.value = user.name;
+          mobileInput.value = user.mobile;
+          changeUserBtn.style.display = "block";
+        }
+      } catch (e) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+
+    // Change user handler
+    changeUserBtn.addEventListener("click", () => {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    });
+
+    // Submit payment
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const name = document.getElementById("name").value;
-      const mobile = document.getElementById("mobile").value;
-      const amount = document.getElementById("amount").value;
+      const name = nameInput.value.trim();
+      const mobile = mobileInput.value.trim();
+      const amount = Number(amountInput.value);
 
-      console.log("Submitting payment:", { name, mobile, amount });
+      // Basic validation
+      if (!name || !mobile) {
+        alert("Please enter name and mobile number");
+        return;
+      }
 
-      const res = await fetch("/create-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, mobile, amount })
-      });
+      if (!Number.isInteger(amount) || amount <= 0) {
+        alert("Please enter a valid amount greater than ₹0");
+        return;
+      }
 
-      const data = await res.json();
-      console.log("Server response:", data);
+      if (amount > 10000) {
+        alert("Amount seems too high. Please enter a valid amount.");
+        return;
+      }
 
-      if (data.payment_url) {
-        window.location.href = data.payment_url;
-      } else {
-        alert("Failed to create payment");
+      // Save user details (NOT amount)
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ name, mobile })
+      );
+
+      try {
+        const res = await fetch("/create-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, mobile, amount })
+        });
+
+        const data = await res.json();
+
+        if (data.payment_url) {
+          window.location.href = data.payment_url;
+        } else {
+          alert("Failed to create payment");
+        }
+      } catch (err) {
+        alert("Something went wrong. Please try again.");
       }
     });
   </script>
