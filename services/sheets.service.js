@@ -1,9 +1,9 @@
 const { google } = require("googleapis");
 
 /**
- * Initialize Google Sheets client
+ * Initialize Google Sheets client (AUTH FIXED)
  */
-function getSheetsClient() {
+async function getSheetsClient() {
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON not set");
   }
@@ -13,22 +13,23 @@ function getSheetsClient() {
 
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
 
-  const auth = new google.auth.JWT(
-    credentials.client_email,
-    null,
-    credentials.private_key,
-    ["https://www.googleapis.com/auth/spreadsheets"]
-  );
+  const auth = new google.auth.JWT({
+    email: credentials.client_email,
+    key: credentials.private_key,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+  });
+
+  // 🔑 THIS IS THE CRITICAL PART
+  await auth.authorize();
 
   return google.sheets({ version: "v4", auth });
 }
 
 /**
- * Get today's tab name in YYYY-MM-DD
+ * Get today's tab name YYYY-MM-DD
  */
 function getTodayTabName() {
-  const now = new Date();
-  return now.toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
 }
 
 /**
@@ -60,19 +61,15 @@ async function ensureSheetExists(sheets, sheetId, title) {
 }
 
 /**
- * Append webhook payload to Google Sheet
- * - Dynamic headers
- * - Dynamic columns
- * - Deduplicate by upi_txn_id
+ * Write webhook payload to Google Sheet
  */
 async function writePaymentToSheet(payload) {
-  const sheets = getSheetsClient();
+  const sheets = await getSheetsClient();
   const sheetId = process.env.SHEET_ID;
   const tabName = getTodayTabName();
 
   await ensureSheetExists(sheets, sheetId, tabName);
 
-  // Read existing data
   const readRes = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
     range: `${tabName}!A1:ZZ`
@@ -93,39 +90,32 @@ async function writePaymentToSheet(payload) {
   }
 
   const payloadKeys = Object.keys(payload);
-
-  // Build final headers (append new keys if missing)
   const finalHeaders = [...headers];
+
   payloadKeys.forEach(key => {
     if (!finalHeaders.includes(key)) {
       finalHeaders.push(key);
     }
   });
 
-  // If headers changed, update header row
+  // Update headers if changed
   if (finalHeaders.length !== headers.length) {
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
       range: `${tabName}!A1`,
       valueInputOption: "RAW",
-      requestBody: {
-        values: [finalHeaders]
-      }
+      requestBody: { values: [finalHeaders] }
     });
   }
 
-  // Build row in header order
   const row = finalHeaders.map(h => payload[h] ?? "");
 
-  // Append row
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
     range: `${tabName}!A1`,
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
-    requestBody: {
-      values: [row]
-    }
+    requestBody: { values: [row] }
   });
 
   console.log("✅ Written payment to Google Sheet:", payload.upi_txn_id);
