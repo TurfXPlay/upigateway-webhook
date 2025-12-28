@@ -2,15 +2,11 @@ const express = require("express");
 const router = express.Router();
 const { google } = require("googleapis");
 
-/**
- * GET /admin/payments/YYYY-MM-DD
- */
 router.get("/admin/payments/:date", async (req, res) => {
   const date = req.params.date;
 
-  // Basic date format validation
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return res.status(400).send("Invalid date format. Use YYYY-MM-DD");
+    return res.status(400).send("Invalid date format");
   }
 
   try {
@@ -26,29 +22,27 @@ router.get("/admin/payments/:date", async (req, res) => {
 
     const sheets = google.sheets({ version: "v4", auth });
 
-    // Read entire tab
     const readRes = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.SHEET_ID,
       range: `${date}!A1:ZZ`
     });
 
     const rows = readRes.data.values || [];
-
     if (rows.length <= 1) {
-      return res.send(renderNoDataPage(date));
+      return res.send(renderNoData(date));
     }
 
     const headers = rows[0];
     const dataRows = rows.slice(1);
 
-    // Map column indexes
-    const colIndex = name => headers.indexOf(name);
+    const idx = name => headers.indexOf(name);
 
-    const idxCreatedAt = colIndex("createdAt");
-    const idxName = colIndex("customer_name");
-    const idxAmount = colIndex("amount");
-    const idxMobile = colIndex("customer_mobile");
-    const idxTxnId = colIndex("client_txn_id");
+    const idxCreatedAt = idx("createdAt");
+    const idxUserName = idx("udf1");
+    const idxUpiName = idx("customer_name");
+    const idxAmount = idx("amount");
+    const idxMobile = idx("customer_mobile");
+    const idxTxnId = idx("client_txn_id");
 
     let totalAmount = 0;
 
@@ -56,9 +50,8 @@ router.get("/admin/payments/:date", async (req, res) => {
       const amount = Number(row[idxAmount] || 0);
       totalAmount += amount;
 
-      const createdAtRaw = row[idxCreatedAt];
-      const istTime = createdAtRaw
-        ? new Date(createdAtRaw).toLocaleTimeString("en-IN", {
+      const istTime = row[idxCreatedAt]
+        ? new Date(row[idxCreatedAt]).toLocaleTimeString("en-IN", {
             hour: "2-digit",
             minute: "2-digit",
             hour12: false,
@@ -68,129 +61,87 @@ router.get("/admin/payments/:date", async (req, res) => {
 
       return {
         time: istTime,
-        name: row[idxName] || "",
+        userName: row[idxUserName] || row[idxUpiName] || "",
+        upiName: row[idxUpiName] || "",
         amount,
         mobile: row[idxMobile] || "",
         txnId: row[idxTxnId] || ""
       };
     });
 
-    return res.send(
-      renderPaymentsPage({
+    res.send(
+      renderTable({
         date,
         rows: tableRows,
         totalAmount,
         totalTransactions: tableRows.length
       })
     );
-
   } catch (err) {
-    console.error("Admin payments view error:", err);
-    return res.status(500).send("Failed to load payments");
+    console.error(err);
+    res.status(500).send("Failed to load payments");
   }
 });
 
-/* =========================
-   HTML Render Helpers
-========================= */
-
-function renderNoDataPage(date) {
+function renderNoData(date) {
   return `
-    <html>
-      <head>
-        <title>No Payments</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial; padding: 20px;">
-        <h2>Payments — ${formatDate(date)}</h2>
-        <p>No payments found for this date.</p>
-      </body>
-    </html>
+    <h2>Payments — ${date}</h2>
+    <p>No payments found.</p>
   `;
 }
 
-function renderPaymentsPage({ date, rows, totalAmount, totalTransactions }) {
-  const tableRowsHtml = rows
-    .map(
-      r => `
-      <tr>
-        <td>${r.time}</td>
-        <td>${r.name}</td>
-        <td style="text-align:right;">₹${r.amount}</td>
-        <td>${r.mobile}</td>
-        <td>${r.txnId}</td>
-      </tr>
-    `
-    )
-    .join("");
-
+function renderTable({ date, rows, totalAmount, totalTransactions }) {
   return `
-    <html>
-      <head>
-        <title>Payments — ${formatDate(date)}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            padding: 16px;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 12px;
-          }
-          th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            font-size: 14px;
-          }
-          th {
-            background: #f2f2f2;
-            text-align: left;
-          }
-          .summary {
-            margin-top: 16px;
-            font-weight: bold;
-          }
-        </style>
-      </head>
-      <body>
+  <html>
+    <head>
+      <title>Payments — ${date}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <style>
+        body { font-family: Arial; padding: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { border: 1px solid #ddd; padding: 8px; font-size: 14px; }
+        th { background: #f2f2f2; }
+      </style>
+    </head>
+    <body>
 
-        <h2>Payments — ${formatDate(date)}</h2>
-        <div>Total transactions: ${totalTransactions}</div>
+      <h2>Payments — ${date}</h2>
+      <div>Total transactions: ${totalTransactions}</div>
 
-        <table>
-          <thead>
+      <table>
+        <thead>
+          <tr>
+            <th>Time (IST)</th>
+            <th>User Name</th>
+            <th>Amount (₹)</th>
+            <th>Mobile</th>
+            <th>Transaction ID</th>
+            <th>UPI Name</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              r => `
             <tr>
-              <th>Time (IST)</th>
-              <th>Name</th>
-              <th>Amount (₹)</th>
-              <th>Mobile</th>
-              <th>Transaction ID</th>
+              <td>${r.time}</td>
+              <td>${r.userName}</td>
+              <td style="text-align:right;">₹${r.amount}</td>
+              <td>${r.mobile}</td>
+              <td>${r.txnId}</td>
+              <td>${r.upiName}</td>
             </tr>
-          </thead>
-          <tbody>
-            ${tableRowsHtml}
-          </tbody>
-        </table>
+          `
+            )
+            .join("")}
+        </tbody>
+      </table>
 
-        <div class="summary">
-          TOTAL AMOUNT: ₹${totalAmount}
-        </div>
+      <h3>TOTAL AMOUNT: ₹${totalAmount}</h3>
 
-      </body>
-    </html>
+    </body>
+  </html>
   `;
-}
-
-function formatDate(date) {
-  const d = new Date(date);
-  return d.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Kolkata"
-  });
 }
 
 module.exports = router;
