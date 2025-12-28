@@ -34,6 +34,10 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/", paymentRoutes);
 app.use("/", webhookRoutes);
 
+const adminRoutes = require("./routes/admin.routes");
+app.use(adminRoutes);
+
+
 /* =========================
    Start Server
 ========================= */
