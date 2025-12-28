@@ -85,8 +85,8 @@
       <button type="submit">Pay Now</button>
     </form>
 
-    <button id="changeUserBtn" class="secondary" style="display:none;">
-      Change user
+    <button id="clearBtn" class="secondary">
+      Clear
     </button>
 
     <div class="note">
@@ -100,7 +100,7 @@
     const nameInput = document.getElementById("name");
     const mobileInput = document.getElementById("mobile");
     const amountInput = document.getElementById("amount");
-    const changeUserBtn = document.getElementById("changeUserBtn");
+    const clearBtn = document.getElementById("clearBtn");
     const form = document.getElementById("payForm");
 
     // Load saved user (if exists)
@@ -111,17 +111,18 @@
         if (user.name && user.mobile) {
           nameInput.value = user.name;
           mobileInput.value = user.mobile;
-          changeUserBtn.style.display = "block";
         }
       } catch (e) {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
 
-    // Change user handler
-    changeUserBtn.addEventListener("click", () => {
+    // Clear button handler
+    clearBtn.addEventListener("click", () => {
       localStorage.removeItem(STORAGE_KEY);
-      location.reload();
+      nameInput.value = "";
+      mobileInput.value = "";
+      amountInput.value = "";
     });
 
     // Submit payment
@@ -132,7 +133,6 @@
       const mobile = mobileInput.value.trim();
       const amount = Number(amountInput.value);
 
-      // Basic validation
       if (!name || !mobile) {
         alert("Please enter name and mobile number");
         return;
