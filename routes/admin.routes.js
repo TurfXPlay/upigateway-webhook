@@ -63,28 +63,40 @@ router.get("/admin/payments/:date?", async (req, res) => {
 
     let totalAmount = 0;
 
-    const tableRows = dataRows.map(row => {
-      const amount = Number(row[idxAmount] || 0);
-      totalAmount += amount;
+    // Build + SORT rows (latest first)
+    const tableRows = dataRows
+      .map(row => {
+        const createdAt = row[idxCreatedAt]
+          ? new Date(row[idxCreatedAt])
+          : null;
 
-      const timeIST = row[idxCreatedAt]
-        ? new Date(row[idxCreatedAt]).toLocaleTimeString("en-IN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-            timeZone: "Asia/Kolkata"
-          })
-        : "";
+        const amount = Number(row[idxAmount] || 0);
+        totalAmount += amount;
 
-      return {
-        time: timeIST,
-        userName: row[idxUserName] || row[idxUpiName] || "",
-        upiName: row[idxUpiName] || "",
-        amount,
-        mobile: row[idxMobile] || "",
-        txnId: row[idxTxnId] || ""
-      };
-    });
+        const timeIST = createdAt
+          ? createdAt.toLocaleTimeString("en-IN", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+              timeZone: "Asia/Kolkata"
+            })
+          : "";
+
+        return {
+          createdAt,
+          time: timeIST,
+          userName: row[idxUserName] || row[idxUpiName] || "",
+          upiName: row[idxUpiName] || "",
+          amount,
+          mobile: row[idxMobile] || "",
+          txnId: row[idxTxnId] || ""
+        };
+      })
+      .sort((a, b) => {
+        if (!a.createdAt) return 1;
+        if (!b.createdAt) return -1;
+        return b.createdAt - a.createdAt; // newest first
+      });
 
     res.send(
       renderTable({

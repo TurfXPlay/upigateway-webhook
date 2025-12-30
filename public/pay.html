@@ -4,13 +4,20 @@
   <meta charset="UTF-8" />
   <title>TurfX Payment</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
+    /* ✅ Fix overflow everywhere */
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: Arial, sans-serif;
       background: #f7f7f7;
       margin: 0;
       padding: 0;
     }
+
     .container {
       max-width: 420px;
       margin: 40px auto;
@@ -19,21 +26,25 @@
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+
     h2 {
       text-align: center;
       margin-bottom: 20px;
     }
+
     label {
       font-size: 14px;
       margin-top: 12px;
       display: block;
     }
+
     input {
       width: 100%;
       padding: 10px;
       margin-top: 6px;
       font-size: 14px;
     }
+
     button {
       width: 100%;
       margin-top: 16px;
@@ -45,24 +56,45 @@
       border-radius: 4px;
       cursor: pointer;
     }
+
     button.secondary {
       background: #e0e0e0;
       color: #000;
-      margin-top: 10px;
     }
+
     .note {
       margin-top: 16px;
       font-size: 12px;
       color: #555;
       text-align: center;
     }
+
+    /* Confirmation panel */
+    .confirm-box {
+      padding: 14px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fafafa;
+      display: none;
+    }
+
+    .confirm-box p {
+      font-size: 14px;
+      margin: 6px 0;
+    }
+
+    .confirm-actions {
+      margin-top: 14px;
+    }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <h2>TurfX Community Payment</h2>
+<div class="container">
+  <h2>TurfX Community Payment</h2>
 
+  <!-- FORM SECTION -->
+  <div id="formSection">
     <form id="payForm">
 
       <label>Name</label>
@@ -94,85 +126,147 @@
     </div>
   </div>
 
-  <script>
-    const STORAGE_KEY = "turfx_user";
+  <!-- CONFIRMATION SECTION -->
+  <div id="confirmBox" class="confirm-box">
+    <p><strong>Confirm Payment</strong></p>
+    <p>Name: <span id="cName"></span></p>
+    <p>Mobile: <span id="cMobile"></span></p>
+    <p>Amount: ₹<span id="cAmount"></span></p>
 
-    const nameInput = document.getElementById("name");
-    const mobileInput = document.getElementById("mobile");
-    const amountInput = document.getElementById("amount");
-    const clearBtn = document.getElementById("clearBtn");
-    const form = document.getElementById("payForm");
+    <hr />
 
-    // Load saved user (if exists)
-    const savedUser = localStorage.getItem(STORAGE_KEY);
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser);
-        if (user.name && user.mobile) {
-          nameInput.value = user.name;
-          mobileInput.value = user.mobile;
-        }
-      } catch (e) {
-        localStorage.removeItem(STORAGE_KEY);
+    <p><strong>How to pay</strong></p>
+    <p>
+      • If a UPI app opens, complete the payment<br />
+      • If you see a QR code:
+        <br />– Scan it using any UPI app, OR
+        <br />– Download and open it in your UPI app<br />
+      • If your app is not listed, scan the QR manually
+    </p>
+
+    <div class="confirm-actions">
+      <button id="proceedBtn">Proceed to Payment</button>
+      <button id="cancelBtn" class="secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = "turfx_user";
+
+  const formSection = document.getElementById("formSection");
+  const confirmBox = document.getElementById("confirmBox");
+
+  const form = document.getElementById("payForm");
+  const clearBtn = document.getElementById("clearBtn");
+
+  const nameInput = document.getElementById("name");
+  const mobileInput = document.getElementById("mobile");
+  const amountInput = document.getElementById("amount");
+
+  const cName = document.getElementById("cName");
+  const cMobile = document.getElementById("cMobile");
+  const cAmount = document.getElementById("cAmount");
+
+  const proceedBtn = document.getElementById("proceedBtn");
+  const cancelBtn = document.getElementById("cancelBtn");
+
+  // Load saved user
+  const savedUser = localStorage.getItem(STORAGE_KEY);
+  if (savedUser) {
+    try {
+      const user = JSON.parse(savedUser);
+      if (user.name && user.mobile) {
+        nameInput.value = user.name;
+        mobileInput.value = user.mobile;
       }
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }
+
+  // Clear
+  clearBtn.addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    nameInput.value = "";
+    mobileInput.value = "";
+    amountInput.value = "";
+  });
+
+  // Submit → show confirmation
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    const name = nameInput.value.trim();
+    const mobile = mobileInput.value.trim();
+    const amount = Number(amountInput.value);
+
+    if (!name || !mobile) {
+      alert("Please enter name and mobile number");
+      return;
     }
 
-    // Clear button handler
-    clearBtn.addEventListener("click", () => {
-      localStorage.removeItem(STORAGE_KEY);
-      nameInput.value = "";
-      mobileInput.value = "";
-      amountInput.value = "";
-    });
+    if (!Number.isInteger(amount) || amount <= 0) {
+      alert("Please enter a valid amount");
+      return;
+    }
 
-    // Submit payment
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+    if (amount > 10000) {
+      alert("Amount seems too high");
+      return;
+    }
 
-      const name = nameInput.value.trim();
-      const mobile = mobileInput.value.trim();
-      const amount = Number(amountInput.value);
+    cName.textContent = name;
+    cMobile.textContent = mobile;
+    cAmount.textContent = amount;
 
-      if (!name || !mobile) {
-        alert("Please enter name and mobile number");
-        return;
+    formSection.style.display = "none";
+    confirmBox.style.display = "block";
+  });
+
+  // Cancel → back to form
+  cancelBtn.addEventListener("click", () => {
+    confirmBox.style.display = "none";
+    formSection.style.display = "block";
+  });
+
+  // Proceed → create payment
+  proceedBtn.addEventListener("click", async () => {
+    const name = nameInput.value.trim();
+    const mobile = mobileInput.value.trim();
+    const amount = Number(amountInput.value);
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ name, mobile })
+    );
+
+    proceedBtn.disabled = true;
+    proceedBtn.textContent = "Redirecting…";
+
+    try {
+      const res = await fetch("/create-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, mobile, amount })
+      });
+
+      const data = await res.json();
+
+      if (data.payment_url) {
+        window.location.href = data.payment_url;
+      } else {
+        alert("Failed to create payment");
+        proceedBtn.disabled = false;
+        proceedBtn.textContent = "Proceed to Payment";
       }
-
-      if (!Number.isInteger(amount) || amount <= 0) {
-        alert("Please enter a valid amount greater than ₹0");
-        return;
-      }
-
-      if (amount > 10000) {
-        alert("Amount seems too high. Please enter a valid amount.");
-        return;
-      }
-
-      // Save user details (NOT amount)
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ name, mobile })
-      );
-
-      try {
-        const res = await fetch("/create-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, mobile, amount })
-        });
-
-        const data = await res.json();
-
-        if (data.payment_url) {
-          window.location.href = data.payment_url;
-        } else {
-          alert("Failed to create payment");
-        }
-      } catch (err) {
-        alert("Something went wrong. Please try again.");
-      }
-    });
-  </script>
+    } catch {
+      alert("Something went wrong");
+      proceedBtn.disabled = false;
+      proceedBtn.textContent = "Proceed to Payment";
+    }
+  });
+</script>
 
 </body>
 </html>
