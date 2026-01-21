@@ -29,7 +29,11 @@ async function getSheetsClient() {
  * Get today's tab name YYYY-MM-DD
  */
 function getTodayTabName() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const istDate = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+  );
+  return istDate.toISOString().slice(0, 10);
 }
 
 /**

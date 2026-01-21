@@ -38,12 +38,22 @@ router.get("/admin/payments/:date?", async (req, res) => {
 
     const sheets = google.sheets({ version: "v4", auth });
 
-    const readRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.SHEET_ID,
-      range: `${date}!A1:ZZ`
-    });
+    let rows = [];
 
-    const rows = readRes.data.values || [];
+    try {
+      const readRes = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.SHEET_ID,
+        range: `${date}!A1:ZZ`
+      });
+
+      rows = readRes.data.values || [];
+    } catch (err) {
+      if (err.code === 400 || err.code === 404) {
+        return res.send(renderNoData(date));
+      }
+      throw err;
+    }
+
 
     if (rows.length <= 1) {
       return res.send(renderNoData(date));
@@ -56,6 +66,7 @@ router.get("/admin/payments/:date?", async (req, res) => {
 
     const idxCreatedAt = idx("createdAt");
     const idxUserName = idx("udf1");
+    const idxVenue = idx("udf2"); 
     const idxUpiName = idx("customer_name");
     const idxAmount = idx("amount");
     const idxMobile = idx("customer_mobile");
@@ -86,6 +97,7 @@ router.get("/admin/payments/:date?", async (req, res) => {
           createdAt,
           time: timeIST,
           userName: row[idxUserName] || row[idxUpiName] || "",
+          venue: row[idxVenue] || "-", 
           upiName: row[idxUpiName] || "",
           amount,
           mobile: row[idxMobile] || "",
@@ -154,6 +166,7 @@ function renderTable({ date, rows, totalAmount, totalTransactions }) {
           <tr>
             <th>Time (IST)</th>
             <th>User Name</th>
+            <th>Venue</th>  
             <th>Amount (₹)</th>
             <th>Mobile</th>
             <th>Transaction ID</th>
@@ -165,6 +178,7 @@ function renderTable({ date, rows, totalAmount, totalTransactions }) {
             <tr>
               <td>${r.time}</td>
               <td>${r.userName}</td>
+              <td>${r.venue}</td>
               <td style="text-align:right;">₹${r.amount}</td>
               <td>${r.mobile}</td>
               <td>${r.txnId}</td>

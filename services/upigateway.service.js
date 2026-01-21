@@ -1,4 +1,4 @@
-async function createOrder({ name, mobile, amount }) {
+async function createOrder({ name, mobile, amount, venue }) {
   const client_txn_id =
     "TXN_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
 
@@ -13,6 +13,7 @@ const payload = {
   customer_mobile: mobile,
   customer_email: `${mobile}@turfxtemp.com`,
   udf1: name,
+  udf2: venue || "",
   redirect_url: `${baseUrl}/payment-success.html`
 };
 
