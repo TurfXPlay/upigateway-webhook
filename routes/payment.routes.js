@@ -18,7 +18,7 @@ router.get("/pay", (req, res) => {
    Create Payment
 ========================= */
 router.post("/create-payment", async (req, res) => {
-  const { name, mobile, amount } = req.body;
+  const { name, mobile, amount, venue } = req.body; // ✅ venue added
 
   if (!name || !mobile || !amount) {
     return res.status(400).json({ error: "Missing fields" });
@@ -33,7 +33,8 @@ router.post("/create-payment", async (req, res) => {
     const paymentUrl = await createOrder({
       name,
       mobile,
-      amount: numericAmount
+      amount: numericAmount,
+      venue // ✅ passed forward
     });
 
     return res.json({ payment_url: paymentUrl });
